@@ -368,6 +368,10 @@ const initHeroIntroduction = (heroElement) => {
   greeting.style.opacity = '1';
   title.style.opacity = '1';
 
+  const getRoleStage = (progress) => (
+    progress < 1 / 3 ? 0 : progress < 2 / 3 ? 1 : 2
+  );
+
   const setRole = (activeIndex) => {
     roles.forEach((role, index) => {
       role.style.opacity = index === activeIndex ? '1' : '0';
@@ -382,7 +386,7 @@ const initHeroIntroduction = (heroElement) => {
     const progress = scrollHeight > 0
       ? Math.max(0, Math.min(1, -rect.top / scrollHeight))
       : 0;
-    const stage = progress < 1 / 3 ? 0 : progress < 2 / 3 ? 1 : 2;
+    const stage = getRoleStage(progress);
 
     if (updateFallbackRole.activeStage !== stage) {
       updateFallbackRole.activeStage = stage;
@@ -408,24 +412,37 @@ const initHeroIntroduction = (heroElement) => {
 
   gsapApi.registerPlugin(scrollTriggerApi);
   gsapApi.set([greeting, title], { autoAlpha: 1, y: 0 });
+  let activeStage = 0;
   gsapApi.set(roles, { autoAlpha: 0, y: 0 });
-  gsapApi.set(roles[0], { autoAlpha: 1 });
+  gsapApi.set(roles[activeStage], { autoAlpha: 1, y: 0 });
 
-  const transitionDuration = reducedMotion ? 0.01 : 0.14;
-  gsapApi.timeline({
-    defaults: { ease: 'power2.out' },
-    scrollTrigger: {
-      trigger: heroElement,
-      start: 'top top',
-      end: 'bottom bottom',
-      scrub: reducedMotion ? false : 0.6,
-      invalidateOnRefresh: true
-    }
-  })
-    .to(roles[0], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.28)
-    .fromTo(roles[1], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.42)
-    .to(roles[1], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.64)
-    .fromTo(roles[2], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.78);
+  const showRoleStage = (stage, direction) => {
+    if (stage === activeStage) return;
+
+    activeStage = stage;
+    gsapApi.killTweensOf(roles);
+    // Keep only the active role in the render tree at full opacity. This
+    // prevents scrub reversal from exposing a partially transparent role.
+    gsapApi.set(roles, { autoAlpha: 0, y: 0 });
+    gsapApi.set(roles[stage], {
+      autoAlpha: 1,
+      y: reducedMotion ? 0 : direction > 0 ? 16 : -16
+    });
+    gsapApi.to(roles[stage], {
+      y: 0,
+      duration: reducedMotion ? 0.01 : 0.22,
+      ease: 'power2.out',
+      overwrite: true
+    });
+  };
+
+  scrollTriggerApi.create({
+    trigger: heroElement,
+    start: 'top top',
+    end: 'bottom bottom',
+    invalidateOnRefresh: true,
+    onUpdate: (self) => showRoleStage(getRoleStage(self.progress), self.direction)
+  });
 };
 
 // ---------------------------------------------------------
