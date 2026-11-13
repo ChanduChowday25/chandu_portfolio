@@ -1730,6 +1730,7 @@ body.low-performance * {
     justify-content: center;
     align-items: center;
     gap: 40px;
+    padding: 0 16px;
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-normal), visibility var(--transition-normal);
@@ -1739,8 +1740,11 @@ body.low-performance * {
     visibility: visible;
   }
   .nav-link {
+    width: min(100%, 22rem);
     font-size: 1.5rem;
     font-family: var(--font-heading);
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 }
 
