@@ -366,12 +366,13 @@ body.low-performance * {
   white-space: nowrap;
   color: var(--accent-secondary-hover);
   font-weight: 600;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 14px rgba(74, 158, 255, 0.55);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 16px rgba(74, 158, 255, 0.7);
   opacity: 0;
 }
 .hero-scroll-hint {
   position: absolute;
-  bottom: 40px;
+  top: calc(100% + clamp(32px, 6vh, 64px));
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

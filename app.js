@@ -352,7 +352,7 @@ class ScrollAnimationController {
 }
 
 // ---------------------------------------------------------
-// 5. Hero Introduction Animation
+// 5. Hero Introduction Scroll Animation
 // ---------------------------------------------------------
 const initHeroIntroduction = (heroElement) => {
   const greeting = document.getElementById('heroGreeting');
@@ -362,67 +362,70 @@ const initHeroIntroduction = (heroElement) => {
   if (!heroElement || !greeting || !title || !roles.length) return;
 
   const gsapApi = window.gsap;
+  const scrollTriggerApi = window.ScrollTrigger;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const setInitialRoleState = () => {
+
+  greeting.style.opacity = '1';
+  title.style.opacity = '1';
+
+  const setRole = (activeIndex) => {
     roles.forEach((role, index) => {
-      role.style.opacity = index === 0 ? '1' : '0';
+      role.style.opacity = index === activeIndex ? '1' : '0';
+      role.style.visibility = index === activeIndex ? 'visible' : 'hidden';
       role.style.transform = 'translateY(0)';
     });
   };
 
-  greeting.style.opacity = '1';
-  title.style.opacity = '1';
-  setInitialRoleState();
+  const updateFallbackRole = () => {
+    const rect = heroElement.getBoundingClientRect();
+    const scrollHeight = rect.height - window.innerHeight;
+    const progress = scrollHeight > 0
+      ? Math.max(0, Math.min(1, -rect.top / scrollHeight))
+      : 0;
+    const stage = progress < 1 / 3 ? 0 : progress < 2 / 3 ? 1 : 2;
 
-  if (reducedMotion || roles.length < 2) return;
+    if (updateFallbackRole.activeStage !== stage) {
+      updateFallbackRole.activeStage = stage;
+      setRole(stage);
+    }
+  };
 
-  if (!gsapApi) {
-    const transitionDuration = 350;
-    let activeIndex = 0;
-
-    const rotateFallback = () => {
-      const currentRole = roles[activeIndex];
-      const nextIndex = (activeIndex + 1) % roles.length;
-      const nextRole = roles[nextIndex];
-
-      currentRole.style.transition = `opacity ${transitionDuration}ms ease, transform ${transitionDuration}ms ease`;
-      nextRole.style.transition = `opacity ${transitionDuration}ms ease, transform ${transitionDuration}ms ease`;
-      currentRole.style.opacity = '0';
-      currentRole.style.transform = 'translateY(-16px)';
-
-      setTimeout(() => {
-        nextRole.style.transform = 'translateY(16px)';
-        requestAnimationFrame(() => {
-          nextRole.style.opacity = '1';
-          nextRole.style.transform = 'translateY(0)';
-        });
-        activeIndex = nextIndex;
-        setTimeout(rotateFallback, 2400);
-      }, transitionDuration);
+  if (!gsapApi || !scrollTriggerApi || roles.length < 3) {
+    let scrollFrame = 0;
+    const onScroll = () => {
+      if (scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        updateFallbackRole();
+      });
     };
 
-    setTimeout(rotateFallback, 2400);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    updateFallbackRole.activeStage = -1;
+    updateFallbackRole();
     return;
   }
 
-  const transitionDuration = 0.35;
-  const timeline = gsapApi.timeline({
-    repeat: -1,
-    repeatDelay: 0.2,
-    defaults: { ease: 'power2.out' }
-  });
+  gsapApi.registerPlugin(scrollTriggerApi);
+  gsapApi.set([greeting, title], { autoAlpha: 1, y: 0 });
+  gsapApi.set(roles, { autoAlpha: 0, y: 0 });
+  gsapApi.set(roles[0], { autoAlpha: 1 });
 
-  roles.forEach((role, index) => {
-    const nextRole = roles[(index + 1) % roles.length];
-
-    timeline
-      .to(role, { autoAlpha: 0, y: -16, duration: transitionDuration, delay: 2.4 })
-      .fromTo(
-        nextRole,
-        { autoAlpha: 0, y: 16 },
-        { autoAlpha: 1, y: 0, duration: transitionDuration }
-      );
-  });
+  const transitionDuration = reducedMotion ? 0.01 : 0.14;
+  gsapApi.timeline({
+    defaults: { ease: 'power2.out' },
+    scrollTrigger: {
+      trigger: heroElement,
+      start: 'top top',
+      end: 'bottom bottom',
+      scrub: reducedMotion ? false : 0.6,
+      invalidateOnRefresh: true
+    }
+  })
+    .to(roles[0], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.28)
+    .fromTo(roles[1], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.42)
+    .to(roles[1], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.64)
+    .fromTo(roles[2], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.78);
 };
 
 // ---------------------------------------------------------
