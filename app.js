@@ -362,13 +362,12 @@ const initHeroIntroduction = (heroElement) => {
   if (!heroElement || !greeting || !title || !roles.length) return;
 
   const gsapApi = window.gsap;
-  const scrollTriggerApi = window.ScrollTrigger;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   greeting.style.opacity = '1';
   title.style.opacity = '1';
 
-  const getRoleStage = (progress) => (
+  const getActiveRole = (progress) => (
     progress < 1 / 3 ? 0 : progress < 2 / 3 ? 1 : 2
   );
 
@@ -380,55 +379,39 @@ const initHeroIntroduction = (heroElement) => {
     });
   };
 
-  const updateFallbackRole = () => {
+  const getHeroProgress = () => {
     const rect = heroElement.getBoundingClientRect();
-    const scrollHeight = rect.height - window.innerHeight;
-    const progress = scrollHeight > 0
-      ? Math.max(0, Math.min(1, -rect.top / scrollHeight))
-      : 0;
-    const stage = getRoleStage(progress);
-
-    if (updateFallbackRole.activeStage !== stage) {
-      updateFallbackRole.activeStage = stage;
-      setRole(stage);
-    }
+    const scrollDistance = Math.max(1, heroElement.offsetHeight - window.innerHeight);
+    const scrollPosition = window.scrollY + rect.top;
+    return Math.max(0, Math.min(1, (window.scrollY - scrollPosition) / scrollDistance));
   };
 
-  if (!gsapApi || !scrollTriggerApi || roles.length < 3) {
-    let scrollFrame = 0;
-    const onScroll = () => {
-      if (scrollFrame) return;
-      scrollFrame = requestAnimationFrame(() => {
-        scrollFrame = 0;
-        updateFallbackRole();
-      });
-    };
+  let activeRole = -1;
+  const applyRole = (nextRole, direction) => {
+    const currentRole = roles[nextRole];
+    const currentVisibility = getComputedStyle(currentRole);
+    if (
+      nextRole === activeRole
+      && currentVisibility.visibility === 'visible'
+      && Number(currentVisibility.opacity) >= 1
+    ) {
+      return;
+    }
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    updateFallbackRole.activeStage = -1;
-    updateFallbackRole();
-    return;
-  }
+    activeRole = nextRole;
 
-  gsapApi.registerPlugin(scrollTriggerApi);
-  gsapApi.set([greeting, title], { autoAlpha: 1, y: 0 });
-  let activeStage = 0;
-  gsapApi.set(roles, { autoAlpha: 0, y: 0 });
-  gsapApi.set(roles[activeStage], { autoAlpha: 1, y: 0 });
+    if (!gsapApi) {
+      setRole(nextRole);
+      return;
+    }
 
-  const showRoleStage = (stage, direction) => {
-    if (stage === activeStage) return;
-
-    activeStage = stage;
     gsapApi.killTweensOf(roles);
-    // Keep only the active role in the render tree at full opacity. This
-    // prevents scrub reversal from exposing a partially transparent role.
     gsapApi.set(roles, { autoAlpha: 0, y: 0 });
-    gsapApi.set(roles[stage], {
+    gsapApi.set(currentRole, {
       autoAlpha: 1,
-      y: reducedMotion ? 0 : direction > 0 ? 16 : -16
+      y: reducedMotion ? 0 : direction < 0 ? -16 : 16
     });
-    gsapApi.to(roles[stage], {
+    gsapApi.to(currentRole, {
       y: 0,
       duration: reducedMotion ? 0.01 : 0.22,
       ease: 'power2.out',
@@ -436,13 +419,20 @@ const initHeroIntroduction = (heroElement) => {
     });
   };
 
-  scrollTriggerApi.create({
-    trigger: heroElement,
-    start: 'top top',
-    end: 'bottom bottom',
-    invalidateOnRefresh: true,
-    onUpdate: (self) => showRoleStage(getRoleStage(self.progress), self.direction)
-  });
+  let scrollFrame = 0;
+  const updateRoleFromScroll = () => {
+    scrollFrame = 0;
+    const activeRoleIndex = getActiveRole(getHeroProgress());
+    const direction = activeRoleIndex < activeRole ? -1 : 1;
+    applyRole(activeRoleIndex, direction);
+  };
+  const onScroll = () => {
+    if (!scrollFrame) scrollFrame = requestAnimationFrame(updateRoleFromScroll);
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  updateRoleFromScroll();
 };
 
 // ---------------------------------------------------------
