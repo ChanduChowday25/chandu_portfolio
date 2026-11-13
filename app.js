@@ -352,58 +352,77 @@ class ScrollAnimationController {
 }
 
 // ---------------------------------------------------------
-// 5. Hero Introduction Scroll Animation
+// 5. Hero Introduction Animation
 // ---------------------------------------------------------
 const initHeroIntroduction = (heroElement) => {
   const greeting = document.getElementById('heroGreeting');
   const title = document.getElementById('heroTitle');
   const roles = Array.from(document.querySelectorAll('.hero-role'));
-  const canvasContainer = document.querySelector('.hero-canvas-container');
 
-  if (!heroElement || !greeting || !title || !roles.length || !canvasContainer) return;
+  if (!heroElement || !greeting || !title || !roles.length) return;
 
   const gsapApi = window.gsap;
-  const scrollTriggerApi = window.ScrollTrigger;
-  if (!gsapApi || !scrollTriggerApi) {
-    console.error('GSAP ScrollTrigger is unavailable; hero introduction cannot be initialized.');
-    greeting.style.opacity = '1';
-    title.style.opacity = '1';
-    roles[0].style.opacity = '1';
-    return;
-  }
-
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reducedMotion) {
-    gsapApi.set([greeting, title], { autoAlpha: 1, y: 0 });
-    gsapApi.set(roles, { autoAlpha: 0, y: 0 });
-    gsapApi.set(roles[0], { autoAlpha: 1 });
+  const setInitialRoleState = () => {
+    roles.forEach((role, index) => {
+      role.style.opacity = index === 0 ? '1' : '0';
+      role.style.transform = 'translateY(0)';
+    });
+  };
+
+  greeting.style.opacity = '1';
+  title.style.opacity = '1';
+  setInitialRoleState();
+
+  if (reducedMotion || roles.length < 2) return;
+
+  if (!gsapApi) {
+    const transitionDuration = 350;
+    let activeIndex = 0;
+
+    const rotateFallback = () => {
+      const currentRole = roles[activeIndex];
+      const nextIndex = (activeIndex + 1) % roles.length;
+      const nextRole = roles[nextIndex];
+
+      currentRole.style.transition = `opacity ${transitionDuration}ms ease, transform ${transitionDuration}ms ease`;
+      nextRole.style.transition = `opacity ${transitionDuration}ms ease, transform ${transitionDuration}ms ease`;
+      currentRole.style.opacity = '0';
+      currentRole.style.transform = 'translateY(-16px)';
+
+      setTimeout(() => {
+        nextRole.style.transform = 'translateY(16px)';
+        requestAnimationFrame(() => {
+          nextRole.style.opacity = '1';
+          nextRole.style.transform = 'translateY(0)';
+        });
+        activeIndex = nextIndex;
+        setTimeout(rotateFallback, 2400);
+      }, transitionDuration);
+    };
+
+    setTimeout(rotateFallback, 2400);
     return;
   }
 
-  gsapApi.registerPlugin(scrollTriggerApi);
-  gsapApi.set([greeting, title], { autoAlpha: 1, y: 0 });
-  gsapApi.set(roles[0], { autoAlpha: 1, y: 0 });
-  gsapApi.set(roles.slice(1), { autoAlpha: 0, y: 0 });
-
+  const transitionDuration = 0.35;
   const timeline = gsapApi.timeline({
-    defaults: { ease: 'power2.out' },
-    scrollTrigger: {
-      trigger: heroElement,
-      start: 'top top',
-      end: 'bottom bottom',
-      scrub: 0.6,
-      invalidateOnRefresh: true
-    }
+    repeat: -1,
+    repeatDelay: 0.2,
+    defaults: { ease: 'power2.out' }
   });
 
-  const transitionDuration = 0.14;
+  roles.forEach((role, index) => {
+    const nextRole = roles[(index + 1) % roles.length];
 
-  timeline
-    .to(roles[0], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.28)
-    .fromTo(roles[1], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.42)
-    .to(roles[1], { autoAlpha: 0, y: -16, duration: transitionDuration }, 0.64)
-    .fromTo(roles[2], { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: transitionDuration }, 0.78);
-
+    timeline
+      .to(role, { autoAlpha: 0, y: -16, duration: transitionDuration, delay: 2.4 })
+      .fromTo(
+        nextRole,
+        { autoAlpha: 0, y: 16 },
+        { autoAlpha: 1, y: 0, duration: transitionDuration }
+      );
+  });
 };
 
 // ---------------------------------------------------------
